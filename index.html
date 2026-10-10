@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>色偽</title>
+  <link rel="stylesheet" href="style.css?v=73">
+</head>
+<body>
+<div id="stage">
+  <button id="btnMute" aria-label="聲音開關"></button>
+
+  <!-- Title screen -->
+  <section id="scr-title" class="screen">
+    <div class="title-plaque"><canvas id="titlePlate" aria-label="色偽"></canvas></div>
+    <p class="title-hint">點擊任意處開始</p>
+  </section>
+
+  <!-- 0. Difficulty select -->
+  <section id="scr-select" class="screen">
+    <div class="intro panel">
+      <div class="intro-tag">遊戲說明</div>
+      <h2>警局裡混進了「色偽」！</h2>
+      <p class="intro-lead">他們長得跟人一模一樣，唯一的破綻是──<b>分不出某些顏色</b>。</p>
+      <ol class="intro-steps">
+        <li><i>1</i><div><b>調一張檢測卡</b><span>30 秒內調好圖案色和背景色</span></div></li>
+        <li><i>2</i><div><b>舉卡給嫌犯看</b><span>嫌犯會把看到的數字寫在號碼牌上</span></div></li>
+        <li><i>3</i><div><b>抓出偽人</b><span>看誰寫錯，指認逮捕</span></div></li>
+      </ol>
+      <p class="intro-tip">訣竅：調出「一般人看得出、偽人看不出」的配色，才抓得到人。</p>
+    </div>
+    <div class="select-col">
+      <div class="select-head"><h1>選擇案件</h1></div>
+      <div class="level-row" id="levelRow"></div>
+    </div>
+  </section>
+
+  <!-- Vision self-test (difficulty Z) -->
+  <section id="scr-vision" class="screen">
+    <div class="vision-plate panel"><canvas id="visionPlate"></canvas></div>
+    <div class="vision-side panel">
+      <div id="visionIntro">
+        <h2>測出我的視角</h2>
+        <ul class="v-list">
+          <li>開始前請關閉夜間模式、護眼模式、藍光濾鏡。</li>
+          <li>共 46 題，大約 8～10 分鐘，分兩階段。</li>
+          <li>第一階段：每題一開始完全沒有色差，把滑桿慢慢往右拉，<b>一看到數字就停下來</b>，輸入你看到的數字。拉到最右邊還是看不到，就按「拉到最右邊還是看不到」。</li>
+          <li>第二階段：不用拉滑桿，看得到就輸入數字，看不到就按「看不到」。<b>不要猜</b>，沒把握就按看不到。</li>
+          <li>測完會自動下載一份紀錄檔（JSON）到「下載」資料夾。</li>
+        </ul>
+        <button id="vtStart" class="btn primary big">開始測驗 ▶</button>
+      </div>
+      <div id="visionTest" hidden>
+        <div class="v-progress"><span id="vtPhase"></span>｜第 <b id="vIdx">1</b> / <span id="vTotal">46</span> 題</div>
+        <p class="v-hint" id="vtHint"></p>
+        <input type="range" id="vtRange" min="0" max="1000" step="1" value="0">
+        <div class="v-answer">
+          <input id="vtNum" inputmode="numeric" maxlength="2" placeholder="看到的數字" autocomplete="off">
+          <button id="vtOk" class="btn primary">確定</button>
+        </div>
+        <div id="vtMsg"></div>
+        <button id="vtNone" class="btn">拉到最右邊還是看不到</button>
+      </div>
+      <div id="visionResult" hidden>
+        <h2>你的視角</h2>
+        <div id="visionResultBody"></div>
+        <div class="v-btns">
+          <button id="vtRetest" class="btn">重新測驗</button>
+          <button id="vtDownload" class="btn primary">下載測驗紀錄</button>
+        </div>
+      </div>
+      <button id="vtQuit" class="btn ghost">← 回選擇案件</button>
+    </div>
+  </section>
+
+  <!-- 1. Briefing -->
+  <section id="scr-brief" class="screen">
+    <div class="folder">
+      <div class="folder-tab" id="briefTab">機密文件</div>
+      <dl class="brief-info">
+        <dt>偽人代號</dt><dd class="code" id="briefCode"></dd>
+        <dt>犯罪記錄</dt><dd class="record-dd"><span id="briefRecord"></span><span class="stamp-anchor"><span class="guilty-stamp" id="guiltyStamp">有罪</span></span></dd>
+        <dt>特徵</dt><dd id="briefTypeDesc"></dd>
+        <dt>目標</dt><dd id="briefCount"></dd>
+      </dl>
+      <p class="brief-znote" id="briefZNote" hidden></p>
+      <div class="brief-notes-title">注意事項</div>
+      <ol class="brief-rules">
+        <li>調一張石原氏檢測卡，舉給所有嫌犯看。</li>
+        <li>嫌犯會把看到的數字寫在號碼牌背面。</li>
+        <li>顏色調得太接近連一般人都看不到數字，不夠則偽人會看到數字。</li>
+        <li id="briefTimeRule"></li>
+      </ol>
+      <div class="brief-btns">
+        <button id="btnBackSelect" class="btn">← 重選案件</button>
+        <button id="btnStartMix" class="btn primary big" data-sfx="start">開始調色 ▶</button>
+      </div>
+    </div>
+    <div class="brief-demo">
+      <div class="demo-card big" id="briefDemo"></div>
+    </div>
+  </section>
+
+  <!-- 2. Mix the test card -->
+  <section id="scr-mix" class="screen">
+    <div class="mix-plates panel">
+      <div class="plates-row">
+        <figure class="plate-fig"><canvas id="plateMain"></canvas><figcaption>你的檢測卡</figcaption></figure>
+      </div>
+      <div id="deReadout" class="de-readout" hidden></div>
+      <div class="mix-plate-actions">
+        <button id="btnReroll" class="btn" data-sfx="reroll">🎲 換一組圖案</button>
+      </div>
+    </div>
+
+    <div class="mix-right">
+    <div class="mix-picker panel">
+      <div class="slots">
+        <button class="slot active" data-slot="fg" data-sfx="slot"><span class="sw"></span><span class="slot-text"><b>圖案色</b><small><span></span><span></span></small></span></button>
+        <button class="slot" data-slot="bg" data-sfx="slot"><span class="sw"></span><span class="slot-text"><b>背景色</b><small><span></span><span></span></small></span></button>
+      </div>
+      <div class="wheel-wrap">
+        <canvas id="wheel"></canvas>
+        <div id="wheelMarker"></div>
+        <div id="wheelTip"></div>
+      </div>
+      <div class="vslider">
+        <span>深淺</span>
+        <input type="range" id="vRange" min="0" max="100" step="1">
+      </div>
+    </div>
+
+    <div class="panel mission" id="mixMission"></div>
+    <div class="panel mix-timer" id="timer" hidden>
+      <div class="mt-label">剩餘時間</div>
+      <div class="mt-num"><b id="timerNum">30</b><span>秒</span></div>
+      <div class="mt-bar"><i id="timerBar"></i></div>
+    </div>
+    <button id="btnSubmit" class="btn primary big" data-sfx="submit">送出檢測 🚨</button>
+    </div>
+  </section>
+
+  <!-- 3/4. Lineup room + result -->
+  <section id="scr-lineup" class="screen">
+    <div id="scene">
+      <div id="wall"></div>
+      <div id="glassTag">單向玻璃 · 觀察室</div>
+      <div id="lineupRow"></div>
+      <div id="desk"></div>
+      <div id="hand" class="down">
+        <div class="held-card"><canvas id="handCard"></canvas></div>
+        <svg class="hand-svg" viewBox="0 0 200 120">
+          <rect x="62" y="60" width="76" height="70" rx="6" fill="#1f3a68"/>
+          <rect x="58" y="56" width="84" height="14" rx="4" fill="#2c5190"/>
+          <path d="M66 58 Q64 26 78 22 L126 22 Q138 26 136 58Z" fill="#f1c9a5"/>
+          <rect x="70" y="2" width="14" height="30" rx="7" fill="#f1c9a5" stroke="#d9a982"/>
+          <rect x="86" y="0" width="14" height="30" rx="7" fill="#f1c9a5" stroke="#d9a982"/>
+          <rect x="102" y="0" width="14" height="30" rx="7" fill="#f1c9a5" stroke="#d9a982"/>
+          <rect x="118" y="4" width="13" height="28" rx="6.5" fill="#f1c9a5" stroke="#d9a982"/>
+          <path d="M66 44 Q48 38 50 22 Q54 16 62 24 L72 36Z" fill="#f1c9a5" stroke="#d9a982"/>
+        </svg>
+      </div>
+      <div id="sceneMsg"></div>
+    </div>
+    <div id="lineupBar">
+      <div id="lineupHint"></div>
+      <button id="btnArrest" class="btn danger big" data-sfx="confirm" disabled>確定逮捕 🚔</button>
+    </div>
+    <div id="resultModal" hidden>
+      <div class="result-box">
+        <div class="result-side">
+          <h2 id="resTitle"></h2>
+          <p id="resFlavor"></p>
+          <div id="resDiag"></div>
+          <ul id="resReasons"></ul>
+          <button id="btnAgain" class="btn primary big" data-sfx="start">再來一局 ↻</button>
+        </div>
+        <div class="res-plates">
+          <figure><figcaption>你看到的</figcaption><canvas id="resPlateN"></canvas></figure>
+          <div class="res-arrow">➜</div>
+          <figure><figcaption id="resPlateICap"></figcaption><canvas id="resPlateI"></canvas></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="audio.js?v=73"></script>
+<script src="core.js?v=73"></script>
+<script src="characters.js?v=73"></script>
+<script src="game.js?v=73"></script>
+</body>
+</html>
